@@ -75,7 +75,7 @@ app.post("/register/", async (request, response) => {
       response.status(400);
       response.send("Password is too short");
     } else {
-      const hashedPassword = bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, 10);
       const createUserQuery = `INSERT INTO
             user (username, password, name, gender)
             VALUES('${username}', "${hashedPassword}", "${name}", "${gender}");`;
@@ -92,7 +92,7 @@ app.post("/login/", async (request, response) => {
   const dbUser = await db.get(isValidUserQuery);
   if (dbUser === undefined) {
     response.status(400);
-    response.send("Invalid User");
+    response.send("Invalid user");
   } else {
     isCorrectPassword = await bcrypt.compare(password, dbUser.password);
     if (isCorrectPassword) {
@@ -110,9 +110,24 @@ app.post("/login/", async (request, response) => {
 
 //API 3
 app.get("/user/tweets/feed/", authenticateAPI, async (request, response) => {
-  const { limit } = request.query;
   const { username } = request;
-  const Query = `SELECT user.username as username, tweet.tweet as tweet, tweet.date_time as dateTime from (user inner join tweet on user.user_id = tweet.user_id) as T WHERE T.user_id in (SELECT follower.following_user_id from follower INNER join user on user.user_id = follower.follower_user_id WHERE user.username = "${username}") order by dateTime desc limit ${limit};`;
+  const userQuery = `SELECT user_id from user where username = '${username}';`;
+  const dbUser = await db.get(userQuery);
+  const userId = dbUser.user_id;
+
+  const Query = `SELECT 
+    user.username, tweet.tweet, tweet.date_time AS dateTime
+  FROM
+    follower
+  INNER JOIN tweet
+    ON follower.following_user_id = tweet.user_id
+  INNER JOIN user
+    ON tweet.user_id = user.user_id
+  WHERE 
+    follower.follower_user_id = ${userId}
+  ORDER BY 
+    tweet.date_time DESC
+  LIMIT 4;`;
   const dbResponse = await db.all(Query);
   response.send(dbResponse);
 });
