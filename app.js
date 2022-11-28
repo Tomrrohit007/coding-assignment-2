@@ -237,13 +237,27 @@ app.get(
 );
 
 // API 9
-
 app.get("/user/tweets/", authenticateAPI, async (request, response) => {
   const { username } = request;
   const userQuery = `SELECT user_id from user where username = '${username}';`;
   const dbUser = await db.get(userQuery);
   const userId = dbUser.user_id;
-  const tweetQuery = `SELECT DISTINCT tweet.tweet,count(like.like_id) as likes, count(reply.reply_id) as replies, tweet.date_time as dateTime from tweet left JOIN like on like.tweet_id = tweet.tweet_id LEFT join reply on reply.tweet_id = tweet.tweet_id where tweet.user_id = ${userId} group by tweet.tweet_id;`;
+  const tweetQuery = `SELECT 
+   tweet,
+   (
+       SELECT COUNT(like_id)
+       FROM like
+       WHERE tweet_id=tweet.tweet_id
+   ) AS likes,
+   (
+       SELECT COUNT(reply_id)
+       FROM reply
+       WHERE tweet_id=tweet.tweet_id  
+   ) AS replies,
+   date_time AS dateTime
+   FROM tweet
+   WHERE user_id= ${userId}
+   `;
   const dbResponse = await db.all(tweetQuery);
   response.send(dbResponse);
 });
